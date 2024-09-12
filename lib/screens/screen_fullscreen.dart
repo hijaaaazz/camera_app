@@ -22,7 +22,6 @@ class ScreenFullImage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         foregroundColor: const Color.fromARGB(255, 0, 0, 0),
-        title: const Text('Full Screen Image'),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
