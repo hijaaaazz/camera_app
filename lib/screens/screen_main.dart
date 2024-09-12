@@ -1,14 +1,12 @@
-import 'dart:io';
-
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:camera_app/screens/screen_gallery.dart';
-import 'package:external_path/external_path.dart';
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:gap/gap.dart';
-import 'package:media_scanner/media_scanner.dart';
 
 class ScreenMain extends StatefulWidget {
-final List <CameraDescription> cameras ;
+  final List<CameraDescription> cameras;
 
   const ScreenMain({super.key, required this.cameras});
 
@@ -18,61 +16,45 @@ final List <CameraDescription> cameras ;
 
 class _ScreenMainState extends State<ScreenMain> {
   late CameraController cameraController;
-  late Future<void> cameravalue;
+  late Future<void> cameraValue;
   bool isFlashOn = false;
-  bool isRearCameraOn=true;
+  bool isRearCameraOn = true;
 
-  late List <File> imageList=[];
+  final Box imageBox = Hive.box('imageBox');
 
-  Future<File> saveImage(XFile image)async {
-    final downloadPath = await ExternalPath.getExternalStoragePublicDirectory(ExternalPath.DIRECTORY_DOWNLOADS);
-    final filename ='${DateTime.now().millisecondsSinceEpoch}.png';
-    final file = File('$downloadPath/$filename');
-
-    try{
-      await file.writeAsBytes(await image.readAsBytes());
-      }catch(_){}
-
-      return file;
-
-      
-  }
-
-  void takeImage() async{
+  void takeImage() async {
     XFile? image;
 
-    if(cameraController.value.isTakingPicture|| !cameraController.value.isInitialized){
+    if (cameraController.value.isTakingPicture || !cameraController.value.isInitialized) {
       return;
     }
-    if(isFlashOn== false){
-      await cameraController.setFlashMode((FlashMode.off));
-    }else{
+
+    if (isFlashOn == false) {
+      await cameraController.setFlashMode(FlashMode.off);
+    } else {
       await cameraController.setFlashMode(FlashMode.torch);
     }
-    image= await cameraController.takePicture();
-    if(cameraController.value.flashMode== FlashMode.torch){
+
+    image = await cameraController.takePicture();
+    if (cameraController.value.flashMode == FlashMode.torch) {
       setState(() {
         cameraController.setFlashMode(FlashMode.off);
       });
     }
-    final file = await saveImage(image);
 
-    setState(() {
-        imageList.add(file);
-      });
+    Uint8List imageBytes = await image.readAsBytes();
+    await imageBox.add(imageBytes);
 
-      MediaScanner.loadMedia(path: file.path);
-
-    stdout.write(imageList);
+    setState(() {});
   }
 
-  void startCamera(int camera){
+  void startCamera(int camera) {
     cameraController = CameraController(
       widget.cameras[camera],
-      ResolutionPreset.high,enableAudio: true,
-      );
-      cameravalue=cameraController.initialize();
-      
+      ResolutionPreset.high,
+      enableAudio: true,
+    );
+    cameraValue = cameraController.initialize();
   }
 
   @override
@@ -84,123 +66,163 @@ class _ScreenMainState extends State<ScreenMain> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    
-    
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(onPressed:takeImage,
-      backgroundColor: Colors.white,
-      shape: CircleBorder(),
-      child: Icon(Icons.camera,size:40 ,),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      
+
+    return Scaffold( 
+     
       body: Stack(
         children: [
-          FutureBuilder(future: cameravalue, builder: (context,snapshot){
-            if (snapshot.connectionState== ConnectionState.done){
-              return SizedBox(
-                width: size.width,
-                height: size.height,
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: 100,
-                    child: CameraPreview(cameraController),
+          FutureBuilder(
+            future: cameraValue,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                return SizedBox(
+                  width: size.width,
+                  height: size.height,
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: 100,
+                      child: CameraPreview(cameraController),
+                    ),
                   ),
-                ),
-              );
-            }else{
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-          }),
-          SafeArea
-          (child: Align(
+                );
+              } else {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+            },
+          ),
+          Align(
             alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 270,top: 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: (){
-                      setState(() {
-                        isFlashOn= !isFlashOn;
-                      });
-                    },
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Color.fromARGB(40, 255, 255, 255),
-                        shape: BoxShape.circle,
-                        ),
+            child: Container(
+              color: const Color.fromARGB(255, 0, 0, 0),
+              height: 100,
+              child: Padding(
+                padding: const EdgeInsets.only(top:40),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            isFlashOn = !isFlashOn;
+                          });
+                        },
                         child: Padding(
-                          padding: EdgeInsets.all(10),
-                          child: isFlashOn? 
-                          Icon(Icons.flash_on)
-                          :Icon(Icons.flash_off),
-                          
-                          
-                          ),
-                        
-                    ),
-                  ),
-                  Gap(10),
-                  GestureDetector(
-                    onTap: (){
-                      setState(() {
-                        isRearCameraOn= !isRearCameraOn;
-                      });
-                      isRearCameraOn? startCamera(0): startCamera(1);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color.fromARGB(40, 255, 255, 255),
-                        shape: BoxShape.circle,
+                          padding: const EdgeInsets.all(10),
+                          child: isFlashOn
+                              ? const Icon(Icons.flash_on ,color: Colors.white,)
+                              : const Icon(Icons.flash_off,color: Colors.white,),
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.all(10),
-                          child: isRearCameraOn? 
-                          Icon(Icons.camera_rear)
-                          :Icon(Icons.camera_front),
-                          
-                          
-                          ),
-                        
-                    ),
-                  ),
-                  
-                ],
-              ),
-            ),)),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: GestureDetector(
-                onTap: (){
-                  Navigator.push(context, MaterialPageRoute(builder:(context) =>  ScreenGallery(imageList)));
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(left:10,bottom: 10),
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: const Color.fromARGB(0, 255, 255, 255),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image(image: imageList.isEmpty? AssetImage('lib/assets/image_default.jpg') : FileImage(imageList[imageList.length-1]),
-                      fit: BoxFit.cover,),
-                    ),
-                  ),
+                      ),
+                      const Gap(10),
+                      
+                
+                  ],
                 ),
               ),
-            )
-        ],
-      ),
-    );
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              color: const Color.fromARGB(255, 0, 0, 0),
+              height: 160,
+             
+            ),
+          ),
+          
+          Align(
+            alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom:35 ),
+                child: Row(
+                  
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.center  ,
+                  
+                  children: [
+                    GestureDetector(
+                      onTap:() {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ScreenGallery(),
+                    ),
+                  );
+                },
+                      child: Container(
+                         decoration: BoxDecoration(
+                          color: const Color.fromARGB(65, 255, 255, 255),
+                          borderRadius: BorderRadius.circular(10)
+                        ),
+                        width: 60,
+                        height: 60 ,
+                        child: ClipRRect(
+                          
+                          
+                          borderRadius: BorderRadius.circular(6),
+                          child: imageBox.isEmpty
+                              ? const Image(
+                                  image: AssetImage('lib/assets/image_default.jpg'),
+                                  
+                                )
+                              : Image.memory(
+                                  imageBox.getAt(imageBox.length - 1),
+                                  fit: BoxFit.cover,
+                                ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                       decoration: BoxDecoration(
+                        color: const Color.fromARGB(65, 255, 255, 255),
+                        borderRadius: BorderRadius.circular(60)
+                      ),
+                      width: 100,
+                      height:  100 ,
+                      child:IconButton(
+                        
+                        onPressed: takeImage,
+                        icon: const Icon(Icons.camera,color: Colors.white,size: 50,),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(65, 255, 255, 255),
+                        borderRadius: BorderRadius.circular(10)
+                      ),
+                      width: 60,
+                      height: 60,
+                      
+                      child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              isRearCameraOn = !isRearCameraOn;
+                            });
+                            isRearCameraOn ? startCamera(0) : startCamera(1);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: isRearCameraOn
+                                ? const Icon(Icons.camera_rear,color: Colors.white,)
+                                : const Icon(Icons.camera_front,color: Colors.white,),
+                          ),
+                        ),
+                    ),
+                            
+                            
+                    
+                  ],
+                ),
+              ),
+            ),
+        ]
+          ),
+          
+        
+      );
+    
   }
-  
-  
 }
